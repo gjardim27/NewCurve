@@ -717,6 +717,27 @@ class PIVSpeakerPhaseAverage:
         return urpopt_avg, fits_mask, urpopts
 
     def momentum_integral(self, run, etamin=5e-3, etamax=15e-3, netas=5):
+        """Flux of the fitted u_n jet through spherical caps, integrated over eta.
+
+        ASSUMES AXISYMMETRY.  The PIV plane only gives u_n(theta) in one
+        plane through the speaker axis.  Each dual-Gaussian fit u_n(alpha)
+        (alpha = angle from the axis) is taken to be rotationally symmetric
+        about that axis and integrated over a spherical cap of radius
+        r = r_wall + eta:
+
+            m(eta) = rho0 * 2 pi r^2 * int_0^{alpha_max} u_n(alpha) sin(alpha) d(alpha)
+
+        with alpha_max = pi/24.  Then int m(eta) d(eta) is taken with Simpson's
+        rule.  Any asymmetry of the jet (e.g. from the
+        wall curvature or background flow) is not captured.
+
+        Notes
+        -----
+        * The integrand is linear in u_n, so m(eta) is a mass flux, not a
+          momentum flux (rho u^2).
+        * Lengths are chord-normalised (x/c), so the result is in units of
+          kg/s * c^3; multiply by c^3 for SI.
+        """
         etavalues = np.linspace(etamin, etamax, netas)
 
         urpopt_avg, fits_mask, urpopts = self.fit_dual_gaussians(run, etamin=etamin, etamax=etamax, netas=netas)
@@ -1167,6 +1188,39 @@ class PIVSpeakerInterlaced:
         return peak_rms, peak_rms_rho
 
     def momentum_integral(self, f, width=0.04):
+        """Oscillating-flux amplitude of the speaker jet, from the 8 phases.
+
+        ASSUMES AXISYMMETRY about the speaker axis.  The line
+            integrand = u_n * np.pi * np.abs(D)
+        turns the planar field into an axisymmetric one: D is the signed
+        distance from the axis in the PIV plane, and integrating
+        pi |D| u_n over D in [-width/2, width/2] equals
+        int_0^{width/2} 2 pi s u_n(s) ds (the volume flux through a disk of
+        radius width/2) only if u_n(s) is the same on both sides of the axis.
+        Otherwise it gives the average of the two half-planes.  Out-of-plane
+        asymmetry can't be detected from planar PIV.
+
+        Procedure: for each phase, the fluctuation u_n' = u_n(phi) - u_n_mean
+        is integrated over D and over R in [r, r + width] (R along the
+        axis, from the wall).  A sinusoid a sin(phi + phi0) is fitted to the
+        8 values, and 2a/tau with tau = 2/f (i.e. a*f) is returned.
+
+        Notes
+        -----
+        * No density and linear in u_n: the result is a volume-flux-type
+          quantity, not a momentum flux (rho u^2), despite the name.
+        * Lengths are chord-normalised (x/c): |D| dD dR carries c^3, so
+          multiply by c^3 for SI.
+        * |D| is computed from unshifted (X, Y).  That is the distance to the
+          axis only if the speaker exit point is at the origin; the offset is
+          xc * (yc + ry) / r.
+        * The phase loop is hard-coded to 8 (np.zeros(8), np.arange(0, 2 pi, pi/4)).
+
+        Parameters
+        ----------
+        f : float       drive frequency [Hz]
+        width : float   integration box size (chord-normalised), both in D and R
+        """
         X = self.X
         Y = self.Y
         x = self.x
