@@ -37,14 +37,24 @@ try:
 except ImportError:  # pragma: no cover - only needed for load_run
     lv = None
 
-RHO = 1.18
+RHO = 1.18  # default air density [kg/m^3]; override per instance with rho0=
 
 
 class PIVSpeakerPhaseAverage:
     MI_ROOT = r"/content/drive/MyDrive/Wind Tunnel Shared/Experimental Campaigns/24-01_Naca_651412_Campaign/Model Installation/InstallationRunFolders"
     PIV_ROOT = r"/content/drive/MyDrive/Wind Tunnel Shared/Experimental Campaigns/24-01_Naca_651412_Campaign/PIV/N65_WT_PIV_Flow_Fields"
 
-    def __init__(self):
+    def __init__(self, rho0=RHO):
+        """
+        Parameters
+        ----------
+        rho0 : float
+            Air density [kg/m^3] used in momentum_integral.  Default 1.18.
+            For lab conditions use e.g.
+            acoustic_properties.air_properties(T_C, RH_pct, P_Pa)["rho"].
+            (Named rho0 because self.runs[run]["rho"] is the wall distance.)
+        """
+        self.rho0 = rho0
         self.runs = {}
 
     def load_run(self, run, avg=True, cb_size=8, undscore=None):
@@ -782,7 +792,7 @@ class PIVSpeakerPhaseAverage:
 
             # integral in beta gives factor of 2 pi (integrating around the spherical cap)
             # integrating in alpha needs to be evaluated numerically (azimuth), from 0 to pi/2
-            shell_momenta[i] = 2 * np.pi * r**2 * scipy.integrate.quad(integrand_theta, 0, alpha_max)[0] * RHO
+            shell_momenta[i] = 2 * np.pi * r**2 * scipy.integrate.quad(integrand_theta, 0, alpha_max)[0] * self.rho0
             # if i and np.sign(shell_momenta[i]) != np.sign(shell_momenta[i-1]):
             #     shell_momenta[i] = 0
             #     break
@@ -1002,9 +1012,19 @@ class PIVSpeakerPhaseAverage:
 
 
 class PIVSpeakerInterlaced:
-    def __init__(self, run, n_phases):
+    def __init__(self, run, n_phases, rho0=RHO):
+        """
+        Parameters
+        ----------
+        run : int          run number (phases are LaVision sets _01 ... _08)
+        n_phases : int     number of interlaced phases (8)
+        rho0 : float       air density [kg/m^3], passed to each phase's
+                           PIVSpeakerPhaseAverage.  Default 1.18.
+                           (self.rho is the wall distance, hence rho0.)
+        """
         self.run = run
         self.n_phases = n_phases
+        self.rho0 = rho0
 
     def load_run(self):
         # use above cell technique with 8 phase averages to load
@@ -1016,12 +1036,12 @@ class PIVSpeakerInterlaced:
         corner_coords = []
         # load flow fields
 
-        PME = PIVSpeakerPhaseAverage()
+        PME = PIVSpeakerPhaseAverage(rho0=self.rho0)
         PME.load_run(run, avg=True, cb_size=16, undscore=1)
         PME.fit_circle(run)
         PME.surface_conformed_coordinates(run)
         for i in range(8):
-            PMEs.append(PIVSpeakerPhaseAverage())
+            PMEs.append(PIVSpeakerPhaseAverage(rho0=self.rho0))
             PMEs[i].load_run(run, avg=True, cb_size=16, undscore=i+1)
             PMEs[i].fit_circle(run)
             PMEs[i].surface_conformed_coordinates(run)
