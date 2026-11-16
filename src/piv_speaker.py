@@ -57,6 +57,7 @@ class PIVSpeakerPhaseAverage:
         """
         self.rho0 = rho0
         self.runs = {}
+        self.u_lim = 8  # colour limit [mm/s]; plot_u overwrites it
 
     def load_run(self, run, avg=True, cb_size=8, undscore=None):
         # initialize run dict
