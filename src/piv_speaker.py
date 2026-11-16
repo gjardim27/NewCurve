@@ -1140,7 +1140,7 @@ class PIVSpeakerInterlaced:
         peak_rms_rho = rho.flatten()[peak_rms_index]
         peak_rms = u_rms.flatten()[peak_rms_index]
 
-        self.PME.plot_u(run, quiver=False, u=u_rms, v=v_rms, dep_var=u_rms, show=False, cvar=cvar)
+        self.PME.plot_u(self.run, quiver=False, u=u_rms, v=v_rms, dep_var=u_rms, show=False, cvar=cvar)
         plt.scatter(peak_rms_x, peak_rms_y, color="black")
         plt.show()
 
