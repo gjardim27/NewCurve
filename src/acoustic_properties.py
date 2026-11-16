@@ -88,7 +88,9 @@ Sources
        Sutherland-law constants for mu(T) and kappa(T) of air.
 
 VERIFICATION STATUS (2026-11): the formulae of [ISO] and eq. (5) of [J12] were
-checked against web copies.  [P19], [K00], [G59], [W06] are cited from memory
+checked against web copies, and absorption_iso9613() reproduces the ISO
+table values at 20 C (RH 10-50 %, 125 and 250 Hz) to within ~1 %
+(src/tests/test_acoustic_properties.py).  [P19], [K00], [G59], [W06] are cited from memory
 of the standard texts -- section/equation numbers should be confirmed against
 a physical copy before they go in the paper.
 
