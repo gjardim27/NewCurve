@@ -23,6 +23,7 @@ the module can be imported without it.
 """
 
 import os
+import warnings
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -486,8 +487,21 @@ class PIVSpeakerPhaseAverage:
             amax = avalues[realas][maxidx]
             eta_amax = etavalues[realas][maxidx]
         else:
-            # print(f"can't find peak--assuming a = 0")
-            print(realas)
+            # No fit passed the filters.  amax = 0 used to be returned with
+            # only print(realas), which made a weak (e.g. low-f) run look like
+            # "zero amplitude" downstream.  Warn loudly instead.
+            with np.errstate(divide="ignore", invalid="ignore"):
+                sn = np.abs(avalues / aerrvalues)
+            best_sn = np.nanmax(sn) if np.any(np.isfinite(sn)) else np.nan
+            warnings.warn(
+                f"magnitude_identification(run={run}): no eta level passed the "
+                f"filters (|a/a_err| > 5 and mu_std < 1e-3; best |a/a_err| = "
+                f"{best_sn:.2g} over {netas} levels in [{etamin:g}, {etamax:g}]). "
+                f"Returning amax = 0, eta_amax = nan: this is 'not detected', "
+                f"not a measured zero.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
             amax = 0
             eta_amax = np.nan
         # print(f"eta: {etamax:1.2e}, a: {amax:1.2e}")
