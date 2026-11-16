@@ -33,6 +33,11 @@ import scipy.integrate
 import scipy.interpolate
 import scipy.optimize
 
+try:  # package or flat import (Colab adds src/ to sys.path)
+    from . import streaming_scaling as _ss
+except ImportError:
+    import streaming_scaling as _ss
+
 try:
     import lvpyio as lv
 except ImportError:  # pragma: no cover - only needed for load_run
@@ -1173,7 +1178,16 @@ class PIVSpeakerInterlaced:
 
         self.PME = PME
 
-    def peak_rms(self, etamin=0, etamax=0.02, mode="u_mag"):
+    def peak_rms(self, etamin=0, etamax=0.02, mode="u_mag", plot=True):
+        """Peak RMS of the coherent oscillation near the speaker.
+
+        Searches etamin <= rho <= etamax, |X| <= 0.015 (chord-normalised).
+        mode="u_mag": |u'| RMS; mode="u_n": surface-normal RMS, which is also
+        stored as self.u_n_fluc_rms_peak and self.u_n_fluc_rms_peak_rho (used by
+        holman_criterion).  plot=False skips the figure.
+
+        Returns (peak_rms [m/s], rho at the peak [chord-normalised]).
+        """
         X = self.X
         Y = self.Y
         rho = self.rho
@@ -1196,11 +1210,57 @@ class PIVSpeakerInterlaced:
         peak_rms_rho = rho.flatten()[peak_rms_index]
         peak_rms = u_rms.flatten()[peak_rms_index]
 
-        self.PME.plot_u(self.run, quiver=False, u=u_rms, v=v_rms, dep_var=u_rms, show=False, cvar=cvar)
-        plt.scatter(peak_rms_x, peak_rms_y, color="black")
-        plt.show()
+        if mode == "u_n":
+            self.u_n_fluc_rms_peak = peak_rms
+            self.u_n_fluc_rms_peak_rho = peak_rms_rho
+
+        if plot:
+            self.PME.plot_u(self.run, quiver=False, u=u_rms, v=v_rms, dep_var=u_rms, show=False, cvar=cvar)
+            plt.scatter(peak_rms_x, peak_rms_y, color="black")
+            plt.show()
 
         return peak_rms, peak_rms_rho
+
+    def holman_criterion(self, f, d_hole, nu=1.5e-5):
+        """Synthetic-jet formation criterion of Holman et al. (2005).
+
+        Returns (Re, S, Re_over_S2, forms_jet).
+
+        Uses U0_peak = sqrt(2) * self.u_n_fluc_rms_peak (the std over the 8
+        phases is the RMS of the oscillation; see the qualifying exam eq. 5.5).
+        If peak_rms(mode="u_n") hasn't been called yet, it is called here with
+        its default search window and plot=False.
+
+        The Reynolds number uses the velocity averaged over the expulsion
+        stroke, U_bar = (2/pi) * U0_peak (Holman 2005 convention):
+
+            Re = U_bar d / nu,   S = sqrt(omega d^2 / nu),   Re/S^2 = U_bar / (omega d)
+
+        forms_jet = Re/S^2 > 0.16 (axisymmetric orifice).
+
+        Parameters
+        ----------
+        f : float        drive frequency [Hz]
+        d_hole : float   orifice diameter [m]  (NOT yet confirmed; ask Ari)
+        nu : float       kinematic viscosity [m^2/s]
+
+        Caveat
+        ------
+        u_n_fluc_rms_peak is the largest PIV-measured RMS within 0-0.02c
+        (0-4 mm) of the wall, not the exit velocity in the hole.  With a
+        0.1 mm PIV vector spacing and a sub-mm hole it most likely
+        UNDERESTIMATES U0, which biases Re/S^2 low and forms_jet toward False.
+        See docs/task2_orifice_findings.md.
+
+        Reference: Holman, Utturkar, Mittal, Smith & Cattafesta (2005),
+        "Formation criterion for synthetic jets", AIAA J. 43(10), 2110-2116.
+        """
+        if getattr(self, "u_n_fluc_rms_peak", None) is None:
+            self.peak_rms(mode="u_n", plot=False)
+        U0_peak = np.sqrt(2.0) * self.u_n_fluc_rms_peak
+        h = _ss.holman_criterion(f, U0_peak, d_hole, nu, velocity="amplitude")
+        return (float(h["Re"][0]), float(h["S"][0]),
+                float(h["Re_over_S2"][0]), bool(h["forms_jet"][0]))
 
     def momentum_integral(self, f, width=0.04):
         """Oscillating-flux amplitude of the speaker jet, from the 8 phases.
