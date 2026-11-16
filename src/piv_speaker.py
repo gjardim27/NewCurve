@@ -1308,6 +1308,35 @@ class PIVSpeakerInterlaced:
 
         return 2*a/tau
 
+    def compare_gaussian_models_aic(self, etamin=5e-3, etamax=15e-3, netas=5):
+        """STUB: is the dual-Gaussian fit of u_n_mean justified, or overfitting?
+
+        Not implemented yet.  Planned procedure:
+
+        1. For each eta level, sample u_n_mean(theta) along the arc
+           r = r_wall + eta (same extraction as fit_dual_gaussians, on the
+           cropped self.x, self.y grid).
+        2. Fit two nested models with the SAME cubic baseline in theta:
+             M1: single Gaussian + cubic   (mu, a, sigma, b, m, q, c)       k = 7
+             M2: dual_gaus_third_poly_w_params                            k = 9
+           (magnitude_identification uses Gaussian + LINEAR in x, so its fit
+           is not directly comparable; don't reuse it here.)
+        3. With n points and residual sum of squares RSS,
+             AIC  = n ln(RSS/n) + 2k
+             AICc = AIC + 2k(k+1)/(n-k-1)
+           and report dAIC = AIC_M2 - AIC_M1 per eta. dAIC < -10 is strong
+           support for the second Gaussian; |dAIC| < 2 means it isn't justified.
+        4. Caveat: neighbouring PIV vectors are correlated (50 % overlap
+           windows), so the effective n is smaller than the number of samples
+           and AIC will tend to favour M2.  Thin the samples to about one per
+           interrogation-window spacing, or treat dAIC as a ranking only.
+
+        Returns (planned)
+        -----------------
+        dict with etavalues, AIC_single, AIC_dual, dAIC, n_points per level.
+        """
+        raise NotImplementedError("AIC single- vs dual-Gaussian comparison: stub only")
+
 
 def dual_gaus_third_poly_w_params(theta, mu, a, fa, sigma, fsigma, b, m, q, c):
     a1 = a
